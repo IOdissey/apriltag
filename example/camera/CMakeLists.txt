@@ -10,7 +10,7 @@ set(CMAKE_CXX_STANDARD 14)
 
 add_executable(${PROJECT_NAME} main.cpp)
 
-include_directories("../include")
+include_directories("../../include")
 
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})

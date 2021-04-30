@@ -128,6 +128,8 @@ int main(int argc, char* argv[])
 		int key = cv::waitKey(1);
 		if (key == 27)
 			break;
+		if (key == 32)
+			cv::imwrite("frame.png", frame);
 	}
 
 	apriltag::apriltag_detector_destroy(td);
