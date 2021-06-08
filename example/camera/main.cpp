@@ -13,12 +13,6 @@
 // #include <apriltag/tagStandard41h12.h>
 // #include <apriltag/tagStandard52h13.h>
 
-// for old version opencv
-#if ((CV_MAJOR_VERSION == 3 && CV_VERSION_MINOR >= 3) || CV_MAJOR_VERSION == 4)
-	#define CV_CAP_PROP_FRAME_WIDTH cv::CAP_PROP_FRAME_WIDTH
-	#define CV_CAP_PROP_FRAME_HEIGHT cv::CAP_PROP_FRAME_HEIGHT
-	#define CV_BGR2GRAY cv::COLOR_BGR2GRAY
-#endif
 
 int main(int argc, char* argv[])
 {
@@ -77,16 +71,16 @@ int main(int argc, char* argv[])
 	}
 	const int arg_width = parser.get<int>("width");
 	if (arg_width > 0)
-		cap.set(CV_CAP_PROP_FRAME_WIDTH, arg_width);
+		cap.set(cv::CAP_PROP_FRAME_WIDTH, arg_width);
 	const int arg_height = parser.get<int>("height");
 	if (arg_height > 0)
-		cap.set(CV_CAP_PROP_FRAME_HEIGHT, arg_height);
+		cap.set(cv::CAP_PROP_FRAME_HEIGHT, arg_height);
 
 	cv::Mat frame, gray;
 	while (true)
 	{
 		cap >> frame;
-		cv::cvtColor(frame, gray, CV_BGR2GRAY);
+		cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
 
 		apriltag::image_u8_t im;
 		im.width = gray.cols;
