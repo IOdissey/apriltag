@@ -7,6 +7,7 @@
 #include <sensor_msgs/CompressedImage.h>
 #include <apriltag/apriltag.h>
 #include <apriltag/tag36h11.h>
+#include <apriltag/tag36h10.h>
 #include <apriltag/tag25h9.h>
 #include <apriltag/tag16h5.h>
 
@@ -43,6 +44,8 @@ int main(int argc, char* argv[])
 	const std::string arg_family = parser.get<std::string>("family");
 	if (arg_family == "tag36h11")
 		tf = apriltag::tag36h11_create();
+	else if (arg_family == "tag36h10")
+		tf = apriltag::tag36h10_create();
 	else if (arg_family == "tag25h9")
 		tf = apriltag::tag25h9_create();
 	else if (arg_family == "tag16h5")

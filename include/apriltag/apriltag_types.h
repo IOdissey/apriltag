@@ -102,8 +102,8 @@ namespace apriltag
 
 	void tag_destroy(apriltag_family_t* tf)
 	{
-		if (tf->codes)
-			free(tf->codes);
+		// if (tf->codes)
+		// 	free(tf->codes);
 		if (tf->bit_x)
 			free(tf->bit_x);
 		if (tf->bit_y)

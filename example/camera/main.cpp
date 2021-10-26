@@ -5,6 +5,7 @@
 #include <opencv2/opencv.hpp>
 #include <apriltag/apriltag.h>
 #include <apriltag/tag36h11.h>
+#include <apriltag/tag36h10.h>
 #include <apriltag/tag25h9.h>
 #include <apriltag/tag16h5.h>
 // #include <apriltag/tagCircle21h7.h>
@@ -36,6 +37,8 @@ int main(int argc, char* argv[])
 	const std::string arg_family = parser.get<std::string>("family");
 	if (arg_family == "tag36h11")
 		tf = apriltag::tag36h11_create();
+	else if (arg_family == "tag36h10")
+		tf = apriltag::tag36h10_create();
 	else if (arg_family == "tag25h9")
 		tf = apriltag::tag25h9_create();
 	else if (arg_family == "tag16h5")
@@ -100,7 +103,7 @@ int main(int argc, char* argv[])
 		for (int i = 0; i < zarray_size(detections); ++i)
 		{
 			apriltag::apriltag_detection_t *det;
-            apriltag::zarray_get(detections, i, &det);
+			apriltag::zarray_get(detections, i, &det);
 			cv::Point2d pt1(det->p[0][0], det->p[0][1]);
 			cv::Point2d pt2(det->p[1][0], det->p[1][1]);
 			cv::Point2d pt3(det->p[2][0], det->p[2][1]);
