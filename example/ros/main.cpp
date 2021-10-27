@@ -109,7 +109,7 @@ int main(int argc, char* argv[])
 			const int text_w = 3;
 			for (int i = 0; i < zarray_size(detections); ++i)
 			{
-				apriltag::apriltag_detection_t *det;
+				apriltag::apriltag_detection_t* det;
 				apriltag::zarray_get(detections, i, &det);
 				cv::Point2d pt1(det->p[0][0], det->p[0][1]);
 				cv::Point2d pt2(det->p[1][0], det->p[1][1]);

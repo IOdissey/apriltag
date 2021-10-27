@@ -784,7 +784,7 @@ namespace apriltag
 
 			area += sqrt(p * (p - length[0]) * (p - length[1]) * (p - length[2]));
 
-			if (area < tag_width * tag_width) {
+			if (area < 0.95 * tag_width * tag_width) {
 				res = 0;
 				goto finish;
 			}
