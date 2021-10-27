@@ -1,5 +1,5 @@
 # About
-This is fork from [AprilRobotics/apriltag](https://github.com/AprilRobotics/apriltag) for easily used on windows. This should also work for linux.
+This is fork from [AprilRobotics/apriltag](https://github.com/AprilRobotics/apriltag) for easily used on windows (and linux).
 
 # Features
 * header only
