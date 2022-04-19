@@ -331,11 +331,13 @@ namespace apriltag
 		// now refit the corners of the quad
 		for (int i = 0; i < 4; i++) {
 
+			const int i2 = (i + 1) & 3;
+
 			// solve for the intersection of lines (i) and (i+1)&3.
-			double A00 = lines[i][3], A01 = -lines[(i + 1) & 3][3];
-			double A10 = -lines[i][2], A11 = lines[(i + 1) & 3][2];
-			double B0 = -lines[i][0] + lines[(i + 1) & 3][0];
-			double B1 = -lines[i][1] + lines[(i + 1) & 3][1];
+			double A00 = lines[i][3], A01 = -lines[i2][3];
+			double A10 = -lines[i][2], A11 = lines[i2][2];
+			double B0 = -lines[i][0] + lines[i2][0];
+			double B1 = -lines[i][1] + lines[i2][1];
 
 			double det = A00 * A11 - A10 * A01;
 
@@ -347,8 +349,13 @@ namespace apriltag
 				double L0 = W00 * B0 + W01 * B1;
 
 				// compute intersection
-				quad->p[i][0] = lines[i][0] + L0 * A00;
-				quad->p[i][1] = lines[i][1] + L0 * A10;
+				// quad->p[i][0] = lines[i][0] + L0 * A00;
+				// quad->p[i][1] = lines[i][1] + L0 * A10;
+
+				// Compute intersection. Note that line i represents the line from corner i to (i+1)&3, so
+				// the intersection of line i with line (i+1)&3 represents corner (i+1)&3.
+				quad->p[i2][0] = lines[i][0] + L0 * A00;
+				quad->p[i2][1] = lines[i][1] + L0 * A10;
 			}
 		}
 	}
@@ -383,6 +390,7 @@ namespace apriltag
 
 			if (max_val < epsilon) {
 				fprintf(stderr, "WRN: Matrix is singular.\n");
+				return NULL;
 			}
 
 			// Swap to get best row.
@@ -435,11 +443,15 @@ namespace apriltag
 
 		// XXX Tunable
 		quad->H = homography_compute2(corr_arr);
-
-		quad->Hinv = matd_inverse(quad->H);
-
-		if (quad->H && quad->Hinv)
-			return 0;
+		if (quad->H != NULL) {
+			quad->Hinv = matd_inverse(quad->H);
+			if (quad->Hinv != NULL) {
+			// Success!
+				return 0;
+			}
+			matd_destroy(quad->H);
+			quad->H = NULL;
+		}
 
 		return -1;
 	}
@@ -930,7 +942,7 @@ namespace apriltag
 				}
 
 				// make sure the homographies are computed...
-				if (quad_update_homographies(quad_original))
+				if (quad_update_homographies(quad_original) != 0)
 					continue;
 
 				for (int famidx = 0; famidx < zarray_size(td->tag_families); famidx++) {

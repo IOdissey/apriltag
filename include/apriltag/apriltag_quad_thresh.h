@@ -1121,7 +1121,7 @@ namespace apriltag
 		uint64_zarray_entry_t** clustermap = (uint64_zarray_entry_t**)calloc(nclustermap, sizeof(uint64_zarray_entry_t*));
 
 		int mem_chunk_size = 2048;
-		uint64_zarray_entry_t** mem_pools = (uint64_zarray_entry_t**)malloc(sizeof(uint64_zarray_entry_t*) * 2 * nclustermap / mem_chunk_size);
+		uint64_zarray_entry_t** mem_pools = (uint64_zarray_entry_t**)malloc(sizeof(uint64_zarray_entry_t*) * (1 + 2 * nclustermap / mem_chunk_size)); // SmodeTech: avoid memory corruption when nclustermap < mem_chunk_size
 		int mem_pool_idx = 0;
 		int mem_pool_loc = 0;
 		mem_pools[mem_pool_idx] = (uint64_zarray_entry_t*)calloc(mem_chunk_size, sizeof(uint64_zarray_entry_t));
