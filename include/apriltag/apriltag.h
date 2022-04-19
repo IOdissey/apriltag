@@ -348,10 +348,6 @@ namespace apriltag
 
 				double L0 = W00 * B0 + W01 * B1;
 
-				// compute intersection
-				// quad->p[i][0] = lines[i][0] + L0 * A00;
-				// quad->p[i][1] = lines[i][1] + L0 * A10;
-
 				// Compute intersection. Note that line i represents the line from corner i to (i+1)&3, so
 				// the intersection of line i with line (i+1)&3 represents corner (i+1)&3.
 				quad->p[i2][0] = lines[i][0] + L0 * A00;

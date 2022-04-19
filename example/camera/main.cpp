@@ -97,6 +97,7 @@ int main(int argc, char* argv[])
 		std::cout << "Time detect: " << dt << " s." << std::endl;
 
 		// Draw.
+		const cv::Scalar color_top(255, 0, 0);
 		const cv::Scalar color(0, 255, 0);
 		const int line_w = 3;
 		const int text_w = 3;
@@ -108,10 +109,11 @@ int main(int argc, char* argv[])
 			cv::Point2d pt2(det->p[1][0], det->p[1][1]);
 			cv::Point2d pt3(det->p[2][0], det->p[2][1]);
 			cv::Point2d pt4(det->p[3][0], det->p[3][1]);
-			cv::line(frame, pt1, pt2, color, line_w);
 			cv::line(frame, pt2, pt3, color, line_w);
 			cv::line(frame, pt3, pt4, color, line_w);
 			cv::line(frame, pt4, pt1, color, line_w);
+			cv::line(frame, pt1, pt2, color_top, line_w);
+			cv::circle(frame, pt1, line_w + 2, color_top, -1);
 			int fontface = cv::FONT_HERSHEY_SCRIPT_SIMPLEX;
 			double fontscale = 0.7;
 			int baseline;

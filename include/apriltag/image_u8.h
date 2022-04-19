@@ -136,56 +136,55 @@ namespace apriltag
 		return decim;
 	}
 
-	void convolve(const uint8_t* x, uint8_t* y, int sz, const uint8_t* k, int ksz)
+	void convolve(const uint8_t* x, uint8_t* y, const int sz, const uint8_t* k, const int ksz)
 	{
 		assert((ksz & 1) == 1);
 
-		for (int i = 0; i < ksz / 2 && i < sz; i++)
+		const int ksz_2 = ksz / 2;
+		for (int i = 0; i < ksz_2 && i < sz; i++)
 			y[i] = x[i];
 
-		for (int i = 0; i < sz - ksz; i++) {
+		for (int i = 0; i < sz - ksz; i++)
+		{
 			uint32_t acc = 0;
-
 			for (int j = 0; j < ksz; j++)
 				acc += k[j] * x[i + j];
-
-			y[ksz / 2 + i] = acc >> 8;
+			y[ksz_2 + i] = acc >> 8;
 		}
 
-		for (int i = sz - ksz + ksz / 2; i < sz; i++)
+		for (int i = sz - ksz + ksz_2; i < sz; i++)
 			y[i] = x[i];
 	}
 
-	void image_u8_convolve_2D(image_u8_t* im, const uint8_t* k, int ksz)
+	void image_u8_convolve_2D(image_u8_t* im, const uint8_t* k, const int ksz)
 	{
 		assert((ksz & 1) == 1); // ksz must be odd.
 
-		for (int y = 0; y < im->height; y++) {
+		const int h = im->height;
+		const int w = im->width;
+		const int wh = w * h;
+		uint8_t* b1 = (uint8_t*)malloc(sizeof(uint8_t) * std::max(w, 2 * h));
+		uint8_t* b2 = b1 + h;
 
-			uint8_t* x = (uint8_t*)malloc(sizeof(uint8_t) * im->width);
-			memcpy(x, &im->buf[y * im->width], im->width);
-
-			convolve(x, &im->buf[y * im->width], im->width, k, ksz);
-			free(x);
+		for (int i = 0; i < wh; i += w)
+		{
+			memcpy(b1, &im->buf[i], w);
+			convolve(b1, &im->buf[i], w, k, ksz);
 		}
 
-		for (int x = 0; x < im->width; x++) {
-			uint8_t* xb = (uint8_t*)malloc(sizeof(uint8_t) * im->height);
-			uint8_t* yb = (uint8_t*)malloc(sizeof(uint8_t) * im->height);
-
-			for (int y = 0; y < im->height; y++)
-				xb[y] = im->buf[y * im->width + x];
-
-			convolve(xb, yb, im->height, k, ksz);
-			free(xb);
-
-			for (int y = 0; y < im->height; y++)
-				im->buf[y * im->width + x] = yb[y];
-			free(yb);
+		for (int x = 0; x < w; x++)
+		{
+			for (int y = 0, i = x; y < h; y++, i += w)
+				b1[y] = im->buf[i];
+			convolve(b1, b2, h, k, ksz);
+			for (int y = 0, i = x; y < h; y++, i += w)
+				im->buf[i] = b2[y];
 		}
+
+		free(b1);
 	}
 
-	void image_u8_gaussian_blur(image_u8_t* im, double sigma, int ksz)
+	void image_u8_gaussian_blur(image_u8_t* im, double sigma, const int ksz)
 	{
 		if (sigma == 0)
 			return;
