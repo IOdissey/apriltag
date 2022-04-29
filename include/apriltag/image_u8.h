@@ -163,7 +163,7 @@ namespace apriltag
 		const int h = im->height;
 		const int w = im->width;
 		const int wh = w * h;
-		uint8_t* b1 = (uint8_t*)malloc(sizeof(uint8_t) * std::max(w, 2 * h));
+		uint8_t* b1 = (uint8_t*)malloc(sizeof(uint8_t) * imax(w, 2 * h));
 		uint8_t* b2 = b1 + h;
 
 		for (int i = 0; i < wh; i += w)

@@ -204,11 +204,6 @@ namespace apriltag
 			*mse = eig_small;
 	}
 
-	float pt_compare_angle(const pt_t* a, const pt_t* b)
-	{
-		return a->slope - b->slope;
-	}
-
 	int err_compare_descending(const void* _a, const void* _b)
 	{
 		const double* a = static_cast<const double*>(_a);
@@ -234,7 +229,7 @@ namespace apriltag
 	*/
 	int quad_segment_maxima(const apriltag_detector_t* td, zarray_t* cluster, const line_fit_pt_t* lfps, int indices[4])
 	{
-		int sz = zarray_size(cluster);
+		const int sz = zarray_size(cluster);
 
 		// ksz: when fitting points, how many points on either side do we consider?
 		// (actual "kernel" width is 2ksz).
@@ -325,7 +320,7 @@ namespace apriltag
 		}
 
 		// select only the best maxima if we have too many
-		int max_nmaxima = td->qtp.max_nmaxima;
+		int max_nmaxima = td->max_nmaxima;
 
 		if (nmaxima > max_nmaxima) {
 			double* maxima_errs_copy = (double*)malloc(sizeof(double) * nmaxima);
@@ -354,7 +349,7 @@ namespace apriltag
 		double params01[4], params12[4], params23[4], params30[4];
 
 		// disallow quads where the angle is less than a critical value.
-		double max_dot = td->qtp.cos_critical_rad; //25*M_PI/180);
+		double max_dot = td->cos_critical_rad; //25*M_PI/180);
 
 		for (int m0 = 0; m0 < nmaxima - 3; m0++) {
 			int i0 = maxima[m0];
@@ -364,14 +359,14 @@ namespace apriltag
 
 				fit_line(lfps, sz, i0, i1, params01, &err01, &mse01);
 
-				if (mse01 > td->qtp.max_line_fit_mse)
+				if (mse01 > td->max_line_fit_mse)
 					continue;
 
 				for (int m2 = m1 + 1; m2 < nmaxima - 1; m2++) {
 					int i2 = maxima[m2];
 
 					fit_line(lfps, sz, i1, i2, params12, &err12, &mse12);
-					if (mse12 > td->qtp.max_line_fit_mse)
+					if (mse12 > td->max_line_fit_mse)
 						continue;
 
 					double dot = params01[2] * params12[2] + params01[3] * params12[3];
@@ -382,11 +377,11 @@ namespace apriltag
 						int i3 = maxima[m3];
 
 						fit_line(lfps, sz, i2, i3, params23, &err23, &mse23);
-						if (mse23 > td->qtp.max_line_fit_mse)
+						if (mse23 > td->max_line_fit_mse)
 							continue;
 
 						fit_line(lfps, sz, i3, i0, params30, &err30, &mse30);
-						if (mse30 > td->qtp.max_line_fit_mse)
+						if (mse30 > td->max_line_fit_mse)
 							continue;
 
 						double err = err01 + err12 + err23 + err30;
@@ -410,7 +405,7 @@ namespace apriltag
 		for (int i = 0; i < 4; i++)
 			indices[i] = best_indices[i];
 
-		if (best_error / sz < td->qtp.max_line_fit_mse)
+		if (best_error / sz < td->max_line_fit_mse)
 			return 1;
 		return 0;
 	}
@@ -465,7 +460,7 @@ namespace apriltag
 	inline void ptsort(pt_t* pts, int sz)
 	{
 	#define MAYBE_SWAP(arr,apos,bpos)                                 \
-		if (pt_compare_angle(&(arr[apos]), &(arr[bpos])) > 0) {       \
+		if (arr[apos].slope > arr[bpos].slope > 0) {                  \
 			tmp = arr[apos]; arr[apos] = arr[bpos]; arr[bpos] = tmp;  \
 		};
 
@@ -530,10 +525,10 @@ namespace apriltag
 		ptsort(as, asz);
 		ptsort(bs, bsz);
 
-	#define MERGE(apos,bpos)                                 \
-		if (pt_compare_angle(&(as[apos]), &(bs[bpos])) < 0)  \
-			pts[outpos++] = as[apos++];                      \
-		else                                                 \
+	#define MERGE(apos,bpos)                  \
+		if (as[apos].slope < bs[bpos].slope)  \
+			pts[outpos++] = as[apos++];       \
+		else                                  \
 			pts[outpos++] = bs[bpos++];
 
 		int apos = 0, bpos = 0, outpos = 0;
@@ -566,10 +561,8 @@ namespace apriltag
 		bool normal_border,
 		bool reversed_border)
 	{
-		int res = 0;
-
-		int sz = zarray_size(cluster);
-		if (sz < 24) // Synchronize with later check.
+		int cluster_size = zarray_size(cluster);
+		if (cluster_size < 24) // Synchronize with later check.
 			return 0;
 
 		/////////////////////////////////////////////////////////////
@@ -585,28 +578,24 @@ namespace apriltag
 		uint16_t xmin = p1->x;
 		uint16_t ymax = p1->y;
 		uint16_t ymin = p1->y;
-		for (int pidx = 1; pidx < zarray_size(cluster); pidx++) {
+		for (int pidx = 1; pidx < cluster_size; pidx++)
+		{
 			pt_t* p;
 			zarray_get_volatile(cluster, pidx, &p);
 
-			if (p->x > xmax) {
+			if (p->x > xmax)
 				xmax = p->x;
-			}
-			else if (p->x < xmin) {
+			else if (p->x < xmin)
 				xmin = p->x;
-			}
 
-			if (p->y > ymax) {
+			if (p->y > ymax)
 				ymax = p->y;
-			}
-			else if (p->y < ymin) {
+			else if (p->y < ymin)
 				ymin = p->y;
-			}
 		}
 
-		if ((xmax - xmin) * (ymax - ymin) < tag_width) {
+		if ((xmax - xmin) * (ymax - ymin) < tag_width)
 			return 0;
-		}
 
 		// add some noise to (cx,cy) so that pixels get a more diverse set
 		// of theta estimates. This will help us remove more points.
@@ -620,7 +609,8 @@ namespace apriltag
 
 		float quadrants[2][2] = { {-1 * (2 << 15), 0}, {2 * (2 << 15), 2 << 15} };
 
-		for (int pidx = 0; pidx < zarray_size(cluster); pidx++) {
+		for (int pidx = 0; pidx < cluster_size; pidx++)
+		{
 			pt_t* p;
 			zarray_get_volatile(cluster, pidx, &p);
 
@@ -630,12 +620,13 @@ namespace apriltag
 			dot += dx * p->gx + dy * p->gy;
 
 			float quadrant = quadrants[dy > 0][dx > 0];
-			if (dy < 0) {
+			if (dy < 0)
+			{
 				dy = -dy;
 				dx = -dx;
 			}
-
-			if (dx < 0) {
+			if (dx < 0)
+			{
 				float tmp = dx;
 				dx = dy;
 				dy = -tmp;
@@ -645,78 +636,79 @@ namespace apriltag
 
 		// Ensure that the black border is inside the white border.
 		quad->reversed_border = dot < 0;
-		if (!reversed_border && quad->reversed_border) {
+		if (!reversed_border && quad->reversed_border)
 			return 0;
-		}
-		if (!normal_border && !quad->reversed_border) {
+		if (!normal_border && !quad->reversed_border)
 			return 0;
-		}
 
 		// we now sort the points according to theta. This is a prepatory
 		// step for segmenting them into four lines.
+		ptsort((pt_t*) cluster->data, cluster_size);
+
+		// remove duplicate points. (A byproduct of our segmentation system.)
 		{
-			ptsort((pt_t*) cluster->data, zarray_size(cluster));
+			int outpos = 1;
 
-			// remove duplicate points. (A byproduct of our segmentation system.)
+			pt_t* last;
+			zarray_get_volatile(cluster, 0, &last);
+
+			for (int i = 1; i < cluster_size; i++)
 			{
-				int outpos = 1;
+				pt_t* p;
+				zarray_get_volatile(cluster, i, &p);
 
-				pt_t* last;
-				zarray_get_volatile(cluster, 0, &last);
-
-				for (int i = 1; i < sz; i++) {
-
-					pt_t* p;
-					zarray_get_volatile(cluster, i, &p);
-
-					if (p->x != last->x || p->y != last->y) {
-
-						if (i != outpos) {
-							pt_t* out;
-							zarray_get_volatile(cluster, outpos, &out);
-							memcpy(out, p, sizeof(pt_t));
-						}
-
-						outpos++;
+				if (p->x != last->x || p->y != last->y)
+				{
+					if (i != outpos)
+					{
+						pt_t* out;
+						zarray_get_volatile(cluster, outpos, &out);
+						memcpy(out, p, sizeof(pt_t));
 					}
-
-					last = p;
+					outpos++;
 				}
 
-				cluster->size = outpos;
-				sz = outpos;
+				last = p;
 			}
 
+			cluster->size = outpos;
+			cluster_size = outpos;
 		}
 
-		if (sz < 24)
+		if (cluster_size < 24)
 			return 0;
 
 
-		line_fit_pt_t* lfps = compute_lfps(sz, cluster, im);
+		line_fit_pt_t* lfps = compute_lfps(cluster_size, cluster, im);
 
 		int indices[4];
+		if (!quad_segment_maxima(td, cluster, lfps, indices))
 		{
-			if (!quad_segment_maxima(td, cluster, lfps, indices))
-				goto finish;
+			free(lfps);
+			return 0;
 		}
 
 		double lines[4][4];
 
-		for (int i = 0; i < 4; i++) {
+		for (int i = 0; i < 4; i++)
+		{
 			int i0 = indices[i];
 			int i1 = indices[(i + 1) & 3];
 
 			double err;
-			fit_line(lfps, sz, i0, i1, lines[i], NULL, &err);
+			fit_line(lfps, cluster_size, i0, i1, lines[i], NULL, &err);
 
-			if (err > td->qtp.max_line_fit_mse) {
-				res = 0;
-				goto finish;
+			if (err > td->max_line_fit_mse)
+			{
+				free(lfps);
+				return 0;
 			}
 		}
 
-		for (int i = 0; i < 4; i++) {
+		free(lfps);
+
+		for (int i = 0; i < 4; i++)
+		{
 			// solve for the intersection of lines (i) and (i+1)&3.
 			// p0 + lambda0*u0 = p1 + lambda1*u1, where u0 and u1
 			// are the line directions.
@@ -738,13 +730,11 @@ namespace apriltag
 			double B1 = -lines[i][1] + lines[(i + 1) & 3][1];
 
 			double det = A00 * A11 - A10 * A01;
+			if (fabs(det) < 0.001)
+				return 0;
 
 			// inverse.
 			double W00 = A11 / det, W01 = -A01 / det;
-			if (fabs(det) < 0.001) {
-				res = 0;
-				goto finish;
-			}
 
 			// solve
 			double L0 = W00 * B0 + W01 * B1;
@@ -752,67 +742,45 @@ namespace apriltag
 			// compute intersection
 			quad->p[i][0] = lines[i][0] + L0 * A00;
 			quad->p[i][1] = lines[i][1] + L0 * A10;
-
-			res = 1;
-		}
-
-		// reject quads that are too small
-		{
-			double area = 0;
-
-			// get area of triangle formed by points 0, 1, 2, 0
-			double length[3], p;
-			for (int i = 0; i < 3; i++) {
-				int idxa = i; // 0, 1, 2,
-				int idxb = (i + 1) % 3; // 1, 2, 0
-				length[i] = sqrt(sq(quad->p[idxb][0] - quad->p[idxa][0]) +
-					sq(quad->p[idxb][1] - quad->p[idxa][1]));
-			}
-			p = (length[0] + length[1] + length[2]) / 2;
-
-			area += sqrt(p * (p - length[0]) * (p - length[1]) * (p - length[2]));
-
-			// get area of triangle formed by points 2, 3, 0, 2
-			for (int i = 0; i < 3; i++) {
-				int idxs[] = { 2, 3, 0, 2 };
-				int idxa = idxs[i];
-				int idxb = idxs[i + 1];
-				length[i] = sqrt(sq(quad->p[idxb][0] - quad->p[idxa][0]) +
-					sq(quad->p[idxb][1] - quad->p[idxa][1]));
-			}
-			p = (length[0] + length[1] + length[2]) / 2;
-
-			area += sqrt(p * (p - length[0]) * (p - length[1]) * (p - length[2]));
-
-			if (area < 0.95 * tag_width * tag_width) {
-				res = 0;
-				goto finish;
-			}
 		}
 
 		// reject quads whose cumulative angle change isn't equal to 2PI
+		for (int i = 0; i < 4; i++)
 		{
-			for (int i = 0; i < 4; i++) {
-				int i0 = i, i1 = (i + 1) & 3, i2 = (i + 2) & 3;
+			int i0 = i, i1 = (i + 1) & 3, i2 = (i + 2) & 3;
 
-				double dx1 = quad->p[i1][0] - quad->p[i0][0];
-				double dy1 = quad->p[i1][1] - quad->p[i0][1];
-				double dx2 = quad->p[i2][0] - quad->p[i1][0];
-				double dy2 = quad->p[i2][1] - quad->p[i1][1];
-				double cos_dtheta = (dx1 * dx2 + dy1 * dy2) / sqrt((dx1 * dx1 + dy1 * dy1) * (dx2 * dx2 + dy2 * dy2));
+			double dx1 = quad->p[i1][0] - quad->p[i0][0];
+			double dy1 = quad->p[i1][1] - quad->p[i0][1];
+			double dx2 = quad->p[i2][0] - quad->p[i1][0];
+			double dy2 = quad->p[i2][1] - quad->p[i1][1];
+			if (dx1 * dy2 < dy1 * dx2)
+				return 0;
 
-				if ((cos_dtheta > td->qtp.cos_critical_rad || cos_dtheta < -td->qtp.cos_critical_rad) || dx1 * dy2 < dy1 * dx2) {
-					res = 0;
-					goto finish;
-				}
-			}
+			double d1 = dx1 * dx1 + dy1 * dy1;
+			if (d1 < td->min_tag_area)
+				return 0;
+
+			double d2 = dx1 * dx1 + dy1 * dy1;
+			if (d2 < td->min_tag_area)
+				return 0;
+
+			double cos_dtheta = (dx1 * dx2 + dy1 * dy2) / sqrt(d1 * d2);
+			if (cos_dtheta > td->cos_critical_rad || cos_dtheta < -td->cos_critical_rad)
+				return 0;
 		}
 
-	finish:
+		// area of a convex quadrilateral
+		double area = quad->p[3][0] * quad->p[0][1] - quad->p[0][0] * quad->p[3][1];
+		for (int i = 0; i < 3; ++i)
+			area += quad->p[i][0] * quad->p[i + 1][1] - quad->p[i + 1][0] * quad->p[i][1];
+		area *= 0.5;
 
-		free(lfps);
+		// reject quads that are too small
+		// if (area < 0.95 * tag_width * tag_width)
+		if (area < td->min_tag_area)
+			return 0;
 
-		return res;
+		return 1;
 	}
 
 	void do_unionfind_first_line(const unionfind_t* uf, const image_u8_t* im, int h, int w)
@@ -923,8 +891,14 @@ namespace apriltag
 		const int tw = w / tilesz;
 		const int th = h / tilesz;
 
-		uint8_t* im_max = (uint8_t*)malloc(tw * th * sizeof(uint8_t));
-		uint8_t* im_min = (uint8_t*)malloc(tw * th * sizeof(uint8_t));
+		// uint8_t* im_max = (uint8_t*)malloc(tw * th * sizeof(uint8_t));
+		// uint8_t* im_min = (uint8_t*)malloc(tw * th * sizeof(uint8_t));
+
+		const int tw_th = tw * th;
+		uint8_t* const im_max = (uint8_t*)malloc(4 * tw_th * sizeof(uint8_t));
+		uint8_t* const im_min = im_max + tw_th;
+		uint8_t* const im_max_tmp = im_min + tw_th;
+		uint8_t* const im_min_tmp = im_max_tmp + tw_th;
 
 		// first, collect min/max statistics for each tile
 		for (int ty = 0, idx = 0; ty < th; ty++)
@@ -943,71 +917,61 @@ namespace apriltag
 							max = v;
 					}
 				}
-				im_max[idx] = max;
-				im_min[idx] = min;
+				im_max_tmp[idx] = max;
+				im_min_tmp[idx] = min;
 			}
 		}
 
 		// second, apply 3x3 max/min convolution to "blur" these values
 		// over larger areas. This reduces artifacts due to abrupt changes
 		// in the threshold value.
+		for (int ty = 0, idx = 0; ty < th; ++ty)
 		{
-			uint8_t* im_max_tmp = (uint8_t*)malloc(tw * th * sizeof(uint8_t));
-			uint8_t* im_min_tmp = (uint8_t*)malloc(tw * th * sizeof(uint8_t));
-			for (int ty = 0, idx = 0; ty < th; ++ty)
+			const int dy_beg = (ty == 0)? 0: -1;
+			const int dy_end = (ty == th - 1) ? 0 : 1;
+			for (int tx = 0; tx < tw; ++tx, ++idx)
 			{
-				const int dy_beg = (ty == 0)? 0: -1;
-				const int dy_end = (ty == th - 1) ? 0 : 1;
-				for (int tx = 0; tx < tw; ++tx, ++idx)
+				const int dx_beg = (tx == 0) ? 0 : -1;
+				const int dx_end = (tx == tw - 1) ? 0 : 1;
+				uint8_t max = 0, min = 255;
+				for (int dy = dy_beg; dy <= dy_end; dy++)
 				{
-					const int dx_beg = (tx == 0) ? 0 : -1;
-					const int dx_end = (tx == tw - 1) ? 0 : 1;
-					uint8_t max = 0, min = 255;
-					for (int dy = dy_beg; dy <= dy_end; dy++)
+					for (int dx = dx_beg; dx <= dx_end; dx++)
 					{
-						//if (ty + dy < 0 || ty + dy >= th)
-						//    continue;
-						//for (int dx = -1; dx <= 1; dx++)
-						for (int dx = dx_beg; dx <= dx_end; dx++)
+						const int i = (ty + dy) * tw + tx + dx;
 						{
-							//if (tx + dx < 0 || tx + dx >= tw)
-							//    continue;
-							{
-								const uint8_t m = im_max[(ty + dy) * tw + tx + dx];
-								if (m > max)
-									max = m;
-							}
-							{
-								const uint8_t m = im_min[(ty + dy) * tw + tx + dx];
-								if (m < min)
-									min = m;
-							}
+							const uint8_t m = im_max_tmp[i];
+							if (m > max)
+								max = m;
+						}
+						{
+							const uint8_t m = im_min_tmp[i];
+							if (m < min)
+								min = m;
 						}
 					}
-					im_max_tmp[idx] = max;
-					im_min_tmp[idx] = min;
 				}
+				im_max[idx] = max;
+				im_min[idx] = min;
 			}
-			free(im_max);
-			free(im_min);
-			im_max = im_max_tmp;
-			im_min = im_min_tmp;
 		}
 
-		for (int ty = 0; ty < th; ty++) {
-			for (int tx = 0; tx < tw; tx++) {
-
+		for (int ty = 0; ty < th; ty++)
+		{
+			for (int tx = 0; tx < tw; tx++)
+			{
 				const int min = im_min[ty * tw + tx];
 				const int max = im_max[ty * tw + tx];
 
 				// low contrast region? (no edges)
-				if (max - min < td->qtp.min_white_black_diff) {
-					for (int dy = 0; dy < tilesz; dy++) {
+				if (max - min < td->min_white_black_diff)
+				{
+					for (int dy = 0; dy < tilesz; dy++)
+					{
 						int y = ty * tilesz + dy;
-
-						for (int dx = 0; dx < tilesz; dx++) {
+						for (int dx = 0; dx < tilesz; dx++)
+						{
 							int x = tx * tilesz + dx;
-
 							threshim->buf[y * w + x] = 127;
 						}
 					}
@@ -1020,12 +984,12 @@ namespace apriltag
 				// can be substantially brighter than white tag parts
 				uint8_t thresh = min + (max - min) / 2;
 
-				for (int dy = 0; dy < tilesz; dy++) {
+				for (int dy = 0; dy < tilesz; dy++)
+				{
 					int y = ty * tilesz + dy;
-
-					for (int dx = 0; dx < tilesz; dx++) {
+					for (int dx = 0; dx < tilesz; dx++)
+					{
 						int x = tx * tilesz + dx;
-
 						uint8_t v = im->buf[y * w + x];
 						if (v > thresh)
 							threshim->buf[y * w + x] = 255;
@@ -1037,56 +1001,57 @@ namespace apriltag
 		}
 
 		// we skipped over the non-full-sized tiles above. Fix those now.
+		for (int y = 0; y < h; y++)
 		{
-			for (int y = 0; y < h; y++) {
+			// what is the first x coordinate we need to process in this row?
+			int x0;
 
-				// what is the first x coordinate we need to process in this row?
+			if (y >= th * tilesz)
+				x0 = 0; // we're at the bottom; do the whole row.
+			else
+				x0 = tw * tilesz; // we only need to do the right most part.
 
-				int x0;
+			// compute tile coordinates and clamp.
+			int ty = y / tilesz;
+			if (ty >= th)
+				ty = th - 1;
 
-				if (y >= th * tilesz) {
-					x0 = 0; // we're at the bottom; do the whole row.
-				}
-				else {
-					x0 = tw * tilesz; // we only need to do the right most part.
-				}
+			for (int x = x0; x < w; x++)
+			{
+				int tx = x / tilesz;
+				if (tx >= tw)
+					tx = tw - 1;
 
-				// compute tile coordinates and clamp.
-				int ty = y / tilesz;
-				if (ty >= th)
-					ty = th - 1;
+				int max = im_max[ty * tw + tx];
+				int min = im_min[ty * tw + tx];
 
-				for (int x = x0; x < w; x++) {
-					int tx = x / tilesz;
-					if (tx >= tw)
-						tx = tw - 1;
+				int thresh = min + (max - min) / 2;
 
-					int max = im_max[ty * tw + tx];
-					int min = im_min[ty * tw + tx];
-					int thresh = min + (max - min) / 2;
-
-					uint8_t v = im->buf[y * w + x];
-					if (v > thresh)
-						threshim->buf[y * w + x] = 255;
-					else
-						threshim->buf[y * w + x] = 0;
-				}
+				uint8_t v = im->buf[y * w + x];
+				if (v > thresh)
+					threshim->buf[y * w + x] = 255;
+				else
+					threshim->buf[y * w + x] = 0;
 			}
 		}
 
-		free(im_min);
+		// free(im_min);
 		free(im_max);
 
 		// this is a dilate/erode deglitching scheme that does not improve
 		// anything as far as I can tell.
-		if (td->qtp.deglitch) {
+		if (td->deglitch)
+		{
 			image_u8_t* tmp = image_u8_create(w, h);
-
-			for (int y = 1; y + 1 < h; y++) {
-				for (int x = 1; x + 1 < w; x++) {
+			for (int y = 1; y + 1 < h; y++)
+			{
+				for (int x = 1; x + 1 < w; x++)
+				{
 					uint8_t max = 0;
-					for (int dy = -1; dy <= 1; dy++) {
-						for (int dx = -1; dx <= 1; dx++) {
+					for (int dy = -1; dy <= 1; dy++)
+					{
+						for (int dx = -1; dx <= 1; dx++)
+						{
 							uint8_t v = threshim->buf[(y + dy) * w + x + dx];
 							if (v > max)
 								max = v;
@@ -1095,12 +1060,15 @@ namespace apriltag
 					tmp->buf[y * w + x] = max;
 				}
 			}
-
-			for (int y = 1; y + 1 < h; y++) {
-				for (int x = 1; x + 1 < w; x++) {
+			for (int y = 1; y + 1 < h; y++)
+			{
+				for (int x = 1; x + 1 < w; x++)
+				{
 					uint8_t min = 255;
-					for (int dy = -1; dy <= 1; dy++) {
-						for (int dx = -1; dx <= 1; dx++) {
+					for (int dy = -1; dy <= 1; dy++)
+					{
+						for (int dx = -1; dx <= 1; dx++)
+						{
 							uint8_t v = tmp->buf[(y + dy) * w + x + dx];
 							if (v < min)
 								min = v;
@@ -1109,7 +1077,6 @@ namespace apriltag
 					threshim->buf[y * w + x] = min;
 				}
 			}
-
 			image_u8_destroy(tmp);
 		}
 
@@ -1287,32 +1254,33 @@ namespace apriltag
 			min_tag_width = 3;
 		}
 
-		int sz = zarray_size(clusters);
+		// a cluster should contain only boundary points around the
+		// tag. it cannot be bigger than the whole screen. (Reject
+		// large connected blobs that will be prohibitively slow to
+		// fit quads to.) A typical point along an edge is added three
+		// times (because it has 3 neighbors). The maximum perimeter
+		// is 2w+2h.
+		int max_cluster_pixels = 6 * (w + h);
+		if (max_cluster_pixels > td->max_cluster_pixels)
+			max_cluster_pixels = td->max_cluster_pixels;
 
+		quad_t quad;
+		memset(&quad, 0, sizeof(quad_t));
+
+		const int sz = zarray_size(clusters);
 		for (int cidx = 0; cidx < sz; cidx++) {
 
 			zarray_t* cluster;
 			zarray_get(clusters, cidx, &cluster);
 
-			if (zarray_size(cluster) < td->qtp.min_cluster_pixels)
+			if (zarray_size(cluster) < td->min_cluster_pixels)
 				continue;
 
-			// a cluster should contain only boundary points around the
-			// tag. it cannot be bigger than the whole screen. (Reject
-			// large connected blobs that will be prohibitively slow to
-			// fit quads to.) A typical point along an edge is added three
-			// times (because it has 3 neighbors). The maximum perimeter
-			// is 2w+2h.
-			if (zarray_size(cluster) > 3 * (2 * w + 2 * h)) {
+			if (zarray_size(cluster) > max_cluster_pixels)
 				continue;
-			}
 
-			quad_t quad;
-			memset(&quad, 0, sizeof(quad_t));
-
-			if (fit_quad(td, im, cluster, &quad, min_tag_width, normal_border, reversed_border)) {
+			if (fit_quad(td, im, cluster, &quad, min_tag_width, normal_border, reversed_border))
 				zarray_add(quads, &quad);
-			}
 		}
 
 		return quads;

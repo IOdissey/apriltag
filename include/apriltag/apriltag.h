@@ -52,23 +52,19 @@ namespace apriltag
 	apriltag_detector_t* apriltag_detector_create()
 	{
 		apriltag_detector_t* td = (apriltag_detector_t*)calloc(1, sizeof(apriltag_detector_t));
-
 		td->quad_decimate = 2.0;
 		td->quad_sigma = 0.0;
-
-		td->qtp.max_nmaxima = 10;
-		td->qtp.min_cluster_pixels = 5;
-
-		td->qtp.max_line_fit_mse = 10.0;
-		td->qtp.cos_critical_rad = cos(10 * M_PI / 180);
-		td->qtp.deglitch = 0;
-		td->qtp.min_white_black_diff = 5;
-
+		td->max_nmaxima = 10;
+		td->min_cluster_pixels = 36;      // Some empirical value.
+		td->max_cluster_pixels = 1000000; // Not limited.
+		td->max_line_fit_mse = 10.0;
+		td->cos_critical_rad = cos(20 * M_PI / 180);
+		td->min_white_black_diff = 5;
+		td->deglitch = 0;
+		td->min_tag_area = 25;
 		td->tag_families = zarray_create(sizeof(apriltag_family_t*));
-
 		td->refine_edges = 1;
 		td->decode_sharpening = 0.25;
-
 		return td;
 	}
 
@@ -203,7 +199,6 @@ namespace apriltag
 	void apriltag_detector_destroy(apriltag_detector_t* td)
 	{
 		apriltag_detector_clear_families(td);
-
 		zarray_destroy(td->tag_families);
 		free(td);
 	}

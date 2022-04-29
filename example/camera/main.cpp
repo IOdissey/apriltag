@@ -64,6 +64,9 @@ int main(int argc, char* argv[])
 	td->quad_decimate = parser.get<float>("decimate");
 	td->quad_sigma = parser.get<float>("blur");
 	td->refine_edges = parser.get<int>("refine");
+	td->min_white_black_diff = 40;
+	td->min_tag_area = 100;
+	td->max_line_fit_mse = 1.0;
 
 	const int arg_device = parser.get<int>("device");
 	cv::VideoCapture cap(arg_device);
@@ -97,10 +100,10 @@ int main(int argc, char* argv[])
 		std::cout << "Time detect: " << dt << " s." << std::endl;
 
 		// Draw.
-		const cv::Scalar color_top(255, 0, 0);
-		const cv::Scalar color(0, 255, 0);
-		const int line_w = 3;
-		const int text_w = 3;
+		const cv::Scalar color_top(0, 255, 0);
+		const cv::Scalar color(255, 0, 0);
+		const int line_w = 2;
+		const int text_w = 1;
 		for (int i = 0; i < zarray_size(detections); ++i)
 		{
 			apriltag::apriltag_detection_t* det;
@@ -114,6 +117,9 @@ int main(int argc, char* argv[])
 			cv::line(frame, pt4, pt1, color, line_w);
 			cv::line(frame, pt1, pt2, color_top, line_w);
 			cv::circle(frame, pt1, line_w + 2, color_top, -1);
+			cv::circle(frame, pt2, line_w + 2, color, -1);
+			cv::circle(frame, pt3, line_w + 2, color, -1);
+			cv::circle(frame, pt4, line_w + 2, color, -1);
 			int fontface = cv::FONT_HERSHEY_SCRIPT_SIMPLEX;
 			double fontscale = 0.7;
 			int baseline;
@@ -122,6 +128,8 @@ int main(int argc, char* argv[])
 			cv::Size textsize = cv::getTextSize(text, fontface, fontscale, 2, &baseline);
 			cv::putText(frame, text, cv::Point(c.x - textsize.width / 2, c.y + textsize.height / 2), fontface, fontscale, cv::Scalar(0, 0, 255), 2);
 		}
+		//
+		zarray_destroy(detections);
 
 		cv::imshow("frame", frame);
 		int key = cv::waitKey(1);
