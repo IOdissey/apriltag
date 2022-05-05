@@ -55,13 +55,13 @@ namespace apriltag
 		td->quad_decimate = 2.0;
 		td->quad_sigma = 0.0;
 		td->max_nmaxima = 10;
-		td->min_cluster_pixels = 36;      // Some empirical value.
+		td->min_cluster_pixels = 36;      // Some empirical value (> 0).
 		td->max_cluster_pixels = 1000000; // Not limited.
 		td->max_line_fit_mse = 10.0;
 		td->cos_critical_rad = cos(20 * M_PI / 180);
 		td->min_white_black_diff = 5;
 		td->deglitch = 0;
-		td->min_tag_area = 25;
+		td->min_tag_area = 36;
 		td->tag_families = zarray_create(sizeof(apriltag_family_t*));
 		td->refine_edges = 1;
 		td->decode_sharpening = 0.25;
@@ -830,7 +830,7 @@ namespace apriltag
 	{
 		if (zarray_size(td->tag_families) == 0) {
 			zarray_t* s = zarray_create(sizeof(apriltag_detection_t*));
-			printf("apriltag.c: No tag families enabled.");
+			printf("No tag families enabled.");
 			return s;
 		}
 
@@ -1077,7 +1077,6 @@ namespace apriltag
 			matd_destroy(quad->H);
 			matd_destroy(quad->Hinv);
 		}
-
 		zarray_destroy(quads);
 
 		zarray_sort(detections, detection_compare_function);

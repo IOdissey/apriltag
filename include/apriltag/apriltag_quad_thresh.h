@@ -760,7 +760,7 @@ namespace apriltag
 			if (d1 < td->min_tag_area)
 				return 0;
 
-			double d2 = dx1 * dx1 + dy1 * dy1;
+			double d2 = dx2 * dx2 + dy2 * dy2;
 			if (d2 < td->min_tag_area)
 				return 0;
 
@@ -890,9 +890,6 @@ namespace apriltag
 		// just use the min/max value from the last full tile.
 		const int tw = w / tilesz;
 		const int th = h / tilesz;
-
-		// uint8_t* im_max = (uint8_t*)malloc(tw * th * sizeof(uint8_t));
-		// uint8_t* im_min = (uint8_t*)malloc(tw * th * sizeof(uint8_t));
 
 		const int tw_th = tw * th;
 		uint8_t* const im_max = (uint8_t*)malloc(4 * tw_th * sizeof(uint8_t));
@@ -1035,7 +1032,6 @@ namespace apriltag
 			}
 		}
 
-		// free(im_min);
 		free(im_max);
 
 		// this is a dilate/erode deglitching scheme that does not improve

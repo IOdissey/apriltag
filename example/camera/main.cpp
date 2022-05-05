@@ -65,8 +65,9 @@ int main(int argc, char* argv[])
 	td->quad_sigma = parser.get<float>("blur");
 	td->refine_edges = parser.get<int>("refine");
 	td->min_white_black_diff = 40;
-	td->min_tag_area = 100;
+	td->min_tag_area = 36;
 	td->max_line_fit_mse = 1.0;
+	td->quad_decimate = 1.0;
 
 	const int arg_device = parser.get<int>("device");
 	cv::VideoCapture cap(arg_device);
@@ -108,6 +109,9 @@ int main(int argc, char* argv[])
 		{
 			apriltag::apriltag_detection_t* det;
 			apriltag::zarray_get(detections, i, &det);
+			if (det->hamming > 0)
+				continue;
+
 			cv::Point2d pt1(det->p[0][0], det->p[0][1]);
 			cv::Point2d pt2(det->p[1][0], det->p[1][1]);
 			cv::Point2d pt3(det->p[2][0], det->p[2][1]);
