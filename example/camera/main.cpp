@@ -133,7 +133,7 @@ int main(int argc, char* argv[])
 			cv::putText(frame, text, cv::Point(c.x - textsize.width / 2, c.y + textsize.height / 2), fontface, fontscale, cv::Scalar(0, 0, 255), 2);
 		}
 		//
-		zarray_destroy(detections);
+		apriltag_detections_destroy(detections);
 
 		cv::imshow("frame", frame);
 		int key = cv::waitKey(1);
