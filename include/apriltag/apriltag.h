@@ -919,165 +919,164 @@ namespace apriltag
 
 		////////////////////////////////////////////////////////////////
 		// Step 2. Decode tags from each quad.
+		const int quadidx_max = zarray_size(quads);
+		for (int quadidx = 0; quadidx < quadidx_max; quadidx++)
 		{
-			const int quadidx_max = zarray_size(quads);
-			for (int quadidx = 0; quadidx < quadidx_max; quadidx++) {
-				quad_t* quad_original;
-				zarray_get_volatile(quads, quadidx, &quad_original);
+			quad_t* quad_original;
+			zarray_get_volatile(quads, quadidx, &quad_original);
 
-				// refine edges is not dependent upon the tag family, thus
-				// apply this optimization BEFORE the other work.
-				//if (td->quad_decimate > 1 && td->refine_edges) {
-				if (td->refine_edges) {
-					refine_edges(td, im_orig, quad_original);
-				}
+			// refine edges is not dependent upon the tag family, thus
+			// apply this optimization BEFORE the other work.
+			//if (td->quad_decimate > 1 && td->refine_edges) {
+			if (td->refine_edges)
+				refine_edges(td, im_orig, quad_original);
 
-				// make sure the homographies are computed...
-				if (quad_update_homographies(quad_original) != 0)
+			// make sure the homographies are computed...
+			if (quad_update_homographies(quad_original) != 0)
+				continue;
+
+			for (int famidx = 0; famidx < zarray_size(td->tag_families); famidx++)
+			{
+				apriltag_family_t* family;
+				zarray_get(td->tag_families, famidx, &family);
+
+				if (family->reversed_border != quad_original->reversed_border)
 					continue;
 
-				for (int famidx = 0; famidx < zarray_size(td->tag_families); famidx++) {
-					apriltag_family_t* family;
-					zarray_get(td->tag_families, famidx, &family);
+				// since the geometry of tag families can vary, start any
+				// optimization process over with the original quad.
+				quad_t* quad = quad_copy(quad_original);
 
-					if (family->reversed_border != quad_original->reversed_border) {
-						continue;
+				quick_decode_entry_t entry;
+				float decision_margin = quad_decode(td, family, im_orig, quad, &entry);
+
+				if (decision_margin >= 0 && entry.hamming < 255)
+				{
+					apriltag_detection_t* det = (apriltag_detection_t*)calloc(1, sizeof(apriltag_detection_t));
+
+					det->family = family;
+					det->id = entry.id;
+					det->hamming = entry.hamming;
+					det->decision_margin = decision_margin;
+
+					double theta = entry.rotation * M_PI / 2.0;
+					double c = cos(theta), s = sin(theta);
+
+					// Fix the rotation of our homography to properly orient the tag
+					matd_t* R = matd_create(3, 3);
+					MATD_EL(R, 0, 0) = c;
+					MATD_EL(R, 0, 1) = -s;
+					MATD_EL(R, 1, 0) = s;
+					MATD_EL(R, 1, 1) = c;
+					MATD_EL(R, 2, 2) = 1;
+					det->H = matd_op("M*M", quad->H, R);
+
+					matd_destroy(R);
+
+					homography_project(det->H, 0, 0, &det->c[0], &det->c[1]);
+
+					// [-1, -1], [1, -1], [1, 1], [-1, 1], Desired points
+					// [-1, 1], [1, 1], [1, -1], [-1, -1], FLIP Y
+					// adjust the points in det->p so that they correspond to
+					// counter-clockwise around the quad, starting at -1,-1.
+					for (int i = 0; i < 4; i++)
+					{
+						int tcx = (i == 1 || i == 2) ? 1 : -1;
+						int tcy = (i < 2) ? 1 : -1;
+
+						double p[2];
+
+						homography_project(det->H, tcx, tcy, &p[0], &p[1]);
+
+						det->p[i][0] = p[0];
+						det->p[i][1] = p[1];
 					}
-
-					// since the geometry of tag families can vary, start any
-					// optimization process over with the original quad.
-					quad_t* quad = quad_copy(quad_original);
-
-					quick_decode_entry_t entry;
-					float decision_margin = quad_decode(td, family, im_orig, quad, &entry);
-
-					if (decision_margin >= 0 && entry.hamming < 255) {
-						apriltag_detection_t* det = (apriltag_detection_t*)calloc(1, sizeof(apriltag_detection_t));
-
-						det->family = family;
-						det->id = entry.id;
-						det->hamming = entry.hamming;
-						det->decision_margin = decision_margin;
-
-						double theta = entry.rotation * M_PI / 2.0;
-						double c = cos(theta), s = sin(theta);
-
-						// Fix the rotation of our homography to properly orient the tag
-						matd_t* R = matd_create(3, 3);
-						MATD_EL(R, 0, 0) = c;
-						MATD_EL(R, 0, 1) = -s;
-						MATD_EL(R, 1, 0) = s;
-						MATD_EL(R, 1, 1) = c;
-						MATD_EL(R, 2, 2) = 1;
-						det->H = matd_op("M*M", quad->H, R);
-
-						matd_destroy(R);
-
-						homography_project(det->H, 0, 0, &det->c[0], &det->c[1]);
-
-						// [-1, -1], [1, -1], [1, 1], [-1, 1], Desired points
-						// [-1, 1], [1, 1], [1, -1], [-1, -1], FLIP Y
-						// adjust the points in det->p so that they correspond to
-						// counter-clockwise around the quad, starting at -1,-1.
-						for (int i = 0; i < 4; i++) {
-							int tcx = (i == 1 || i == 2) ? 1 : -1;
-							int tcy = (i < 2) ? 1 : -1;
-
-							double p[2];
-
-							homography_project(det->H, tcx, tcy, &p[0], &p[1]);
-
-							det->p[i][0] = p[0];
-							det->p[i][1] = p[1];
-						}
-
-						zarray_add(detections, &det);
-					}
-
-					quad_destroy(quad);
+					zarray_add(detections, &det);
 				}
+				quad_destroy(quad);
 			}
 		}
-
-		////////////////////////////////////////////////////////////////
-		// Step 3. Reconcile detections--- don't report the same tag more
-		// than once. (Allow non-overlapping duplicate detections.)
+		for (int i = 0; i < zarray_size(quads); i++)
 		{
-			zarray_t* poly0 = g2d_polygon_create_zeros(4);
-			zarray_t* poly1 = g2d_polygon_create_zeros(4);
-
-			for (int i0 = 0; i0 < zarray_size(detections); i0++) {
-
-				apriltag_detection_t* det0;
-				zarray_get(detections, i0, &det0);
-
-				for (int k = 0; k < 4; k++)
-					zarray_set(poly0, k, det0->p[k], NULL);
-
-				for (int i1 = i0 + 1; i1 < zarray_size(detections); i1++) {
-
-					apriltag_detection_t* det1;
-					zarray_get(detections, i1, &det1);
-
-					if (det0->id != det1->id || det0->family != det1->family)
-						continue;
-
-					for (int k = 0; k < 4; k++)
-						zarray_set(poly1, k, det1->p[k], NULL);
-
-					if (g2d_polygon_overlaps_polygon(poly0, poly1)) {
-						// the tags overlap. Delete one, keep the other.
-
-						int pref = 0; // 0 means undecided which one we'll keep.
-						pref = prefer_smaller(pref, det0->hamming, det1->hamming);     // want small hamming
-						pref = prefer_smaller(pref, -det0->decision_margin, -det1->decision_margin);      // want bigger margins
-
-						// if we STILL don't prefer one detection over the other, then pick
-						// any deterministic criterion.
-						for (int i = 0; i < 4; i++) {
-							pref = prefer_smaller(pref, det0->p[i][0], det1->p[i][0]);
-							pref = prefer_smaller(pref, det0->p[i][1], det1->p[i][1]);
-						}
-
-						if (pref == 0) {
-							// at this point, we should only be undecided if the tag detections
-							// are *exactly* the same. How would that happen?
-							printf("uh oh, no preference for overlappingdetection\n");
-						}
-
-						if (pref < 0) {
-							// keep det0, destroy det1
-							apriltag_detection_destroy(det1);
-							zarray_remove_index(detections, i1, 1);
-							i1--; // retry the same index
-							goto retry1;
-						}
-						else {
-							// keep det1, destroy det0
-							apriltag_detection_destroy(det0);
-							zarray_remove_index(detections, i0, 1);
-							i0--; // retry the same index.
-							goto retry0;
-						}
-					}
-
-				retry1:;
-				}
-
-			retry0:;
-			}
-
-			zarray_destroy(poly0);
-			zarray_destroy(poly1);
-		}
-
-		for (int i = 0; i < zarray_size(quads); i++) {
 			quad_t* quad;
 			zarray_get_volatile(quads, i, &quad);
 			matd_destroy(quad->H);
 			matd_destroy(quad->Hinv);
 		}
 		zarray_destroy(quads);
+
+		////////////////////////////////////////////////////////////////
+		// Step 3. Reconcile detections--- don't report the same tag more
+		// than once. (Allow non-overlapping duplicate detections.)
+		zarray_t* poly0 = g2d_polygon_create_zeros(4);
+		zarray_t* poly1 = g2d_polygon_create_zeros(4);
+		for (int i0 = 0; i0 < zarray_size(detections); i0++)
+		{
+			apriltag_detection_t* det0;
+			zarray_get(detections, i0, &det0);
+
+			for (int k = 0; k < 4; k++)
+				zarray_set(poly0, k, det0->p[k], NULL);
+
+			for (int i1 = i0 + 1; i1 < zarray_size(detections); i1++)
+			{
+				apriltag_detection_t* det1;
+				zarray_get(detections, i1, &det1);
+
+				if (det0->id != det1->id || det0->family != det1->family)
+					continue;
+
+				for (int k = 0; k < 4; k++)
+					zarray_set(poly1, k, det1->p[k], NULL);
+
+				if (g2d_polygon_overlaps_polygon(poly0, poly1))
+				{
+					// the tags overlap. Delete one, keep the other.
+
+					int pref = 0; // 0 means undecided which one we'll keep.
+					pref = prefer_smaller(pref, det0->hamming, det1->hamming);     // want small hamming
+					pref = prefer_smaller(pref, -det0->decision_margin, -det1->decision_margin);      // want bigger margins
+
+					// if we STILL don't prefer one detection over the other, then pick
+					// any deterministic criterion.
+					for (int i = 0; i < 4; i++)
+					{
+						pref = prefer_smaller(pref, det0->p[i][0], det1->p[i][0]);
+						pref = prefer_smaller(pref, det0->p[i][1], det1->p[i][1]);
+					}
+
+					if (pref == 0)
+					{
+						// at this point, we should only be undecided if the tag detections
+						// are *exactly* the same. How would that happen?
+						printf("uh oh, no preference for overlappingdetection\n");
+					}
+
+					if (pref < 0)
+					{
+						// keep det0, destroy det1
+						apriltag_detection_destroy(det1);
+						zarray_remove_index(detections, i1, 1);
+						i1--; // retry the same index
+						// goto retry1;
+						continue;
+					}
+					else
+					{
+						// keep det1, destroy det0
+						apriltag_detection_destroy(det0);
+						zarray_remove_index(detections, i0, 1);
+						i0--; // retry the same index.
+						// goto retry0;
+						break;
+					}
+				}
+			// retry1:;
+			}
+		// retry0:;
+		}
+		zarray_destroy(poly0);
+		zarray_destroy(poly1);
 
 		zarray_sort(detections, detection_compare_function);
 

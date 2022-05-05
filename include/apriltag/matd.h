@@ -1239,18 +1239,17 @@ namespace apriltag
 
 				break;
 			}
+			/*
+			case 'D': {
+			int rows = expr[*pos+1]-'0';
+			int cols = expr[*pos+2]-'0';
 
-					/*
-					case 'D': {
-					int rows = expr[*pos+1]-'0';
-					int cols = expr[*pos+2]-'0';
+			matd_t *rhs = matd_create(rows, cols);
 
-					matd_t *rhs = matd_create(rows, cols);
-
-					break;
-					}
-					*/
-					// a constant (SCALAR) defined inline. Treat just like M, creating a matd_t on the fly.
+			break;
+			}
+			*/
+			// a constant (SCALAR) defined inline. Treat just like M, creating a matd_t on the fly.
 			case '0':
 			case '1':
 			case '2':
