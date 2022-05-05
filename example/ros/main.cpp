@@ -127,6 +127,7 @@ int main(int argc, char* argv[])
 				cv::Size textsize = cv::getTextSize(text, fontface, fontscale, 2, &baseline);
 				cv::putText(frame, text, cv::Point(c.x - textsize.width / 2, c.y + textsize.height / 2), fontface, fontscale, cv::Scalar(0, 0, 255), 2);
 			}
+			apriltag_detections_destroy(detections);
 
 			cv::imshow("frame", frame);
 			int key = cv::waitKey(1);
