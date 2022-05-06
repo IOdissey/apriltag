@@ -22,7 +22,6 @@ int main(int argc, char* argv[])
 {
 	cv::String keys =
 		"{h help     |          | print this message}"
-		"{d device   | 0        | camera device number}"
 		"{iw width   | 1280     | width}"
 		"{ih height  | 1024     | height}"
 		"{fps        | 30       | fps}"
@@ -30,7 +29,8 @@ int main(int argc, char* argv[])
 		"{f family   | tag36h11 | tag family to use}"
 		"{x decimate | 2.0      | decimate input image by this factor}"
 		"{b blur     | 0.0      | apply low-pass blur to input}"
-		"{r refine   | 1        | spend more time trying to align edges of tags}";
+		"{r refine   | 1        | spend more time trying to align edges of tags}"
+		"{s scale    | 1.0      | image scale}";
 	cv::CommandLineParser parser(argc, argv, keys);
 	if (parser.has("help"))
 	{
@@ -73,17 +73,11 @@ int main(int argc, char* argv[])
 	td->min_tag_area = 36;
 	td->max_line_fit_mse = 1.0;
 
-	const int arg_device = parser.get<int>("device");
-	cv::VideoCapture cap(arg_device);
-	if (!cap.isOpened())
-	{
-		std::cout << "Couldn't open video capture device (" << arg_device << ")." << std::endl;
-		return -1;
-	}
 	const int arg_width = parser.get<int>("width");
 	const int arg_height = parser.get<int>("height");
 	const int arg_fps = parser.get<int>("fps");
 	const int arg_iso = parser.get<int>("iso");
+	const double arg_scale = parser.get<double>("scale");
 
 	raspicam::RaspiCam cam;
 	cam.setFormat(raspicam::RASPICAM_FORMAT_GRAY);
@@ -100,7 +94,7 @@ int main(int argc, char* argv[])
 	}
 	std::cout << "raspicam: " << width << "x" << height << "@" << cam.getFrameRate() << std::endl;
 
-	cv::Mat frame;
+	cv::Mat frame, gray_sized;;
 	while (true)
 	{
 		auto beg = std::chrono::steady_clock::now();
@@ -119,7 +113,11 @@ int main(int argc, char* argv[])
 
 		// Draw.
 		cv::Mat gray(height, width, CV_8UC1, cam.getImageBufferData());
-		cv::cvtColor(gray, frame, cv::COLOR_GRAY2BGR);
+		if (arg_scale == 1.0)
+			gray_sized = gray;
+		else
+			cv::resize(gray, gray_sized, cv::Size(), arg_scale, arg_scale);
+		cv::cvtColor(gray_sized, frame, cv::COLOR_GRAY2BGR);
 		const cv::Scalar color_top(0, 255, 0);
 		const cv::Scalar color(255, 0, 0);
 		const int line_w = 2;
