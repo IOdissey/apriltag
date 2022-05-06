@@ -100,69 +100,72 @@ int main(int argc, char* argv[])
 	while (true)
 	{
 		auto beg = std::chrono::steady_clock::now();
-		if (!cam.grab())
-			continue;
-
-		apriltag::image_u8_t im;
-		im.width = width;
-		im.height = height;
-		im.buf = cam.getImageBufferData();
-
-		apriltag::zarray_t* detections = apriltag::apriltag_detector_detect(td, &im);
-		auto end = std::chrono::steady_clock::now();
-		double dt = std::chrono::duration_cast<std::chrono::nanoseconds>(end - beg).count() * 1e-9;
-		std::cout << "Time detect: " << dt << " s." << std::endl;
-
-		// Draw.
-		cv::Mat gray(height, width, CV_8UC1, cam.getImageBufferData());
-		if (arg_scale == 1.0)
-			gray_sized = gray;
-		else
-			cv::resize(gray, gray_sized, cv::Size(), arg_scale, arg_scale);
-		cv::cvtColor(gray_sized, frame, cv::COLOR_GRAY2BGR);
-		const cv::Scalar color_top(0, 255, 0);
-		const cv::Scalar color(255, 0, 0);
-		const int line_w = 2;
-		const int text_w = 1;
-		for (int i = 0; i < zarray_size(detections); ++i)
+		if (cam.grab())
 		{
-			apriltag::apriltag_detection_t* det;
-			apriltag::zarray_get(detections, i, &det);
-			if (det->hamming > 0)
-				continue;
+			apriltag::image_u8_t im;
+			im.width = width;
+			im.height = height;
+			im.buf = cam.getImageBufferData();
 
-			cv::Point2d pt1(det->p[0][0], det->p[0][1]);
-			cv::Point2d pt2(det->p[1][0], det->p[1][1]);
-			cv::Point2d pt3(det->p[2][0], det->p[2][1]);
-			cv::Point2d pt4(det->p[3][0], det->p[3][1]);
-			pt1 *= arg_scale;
-			pt2 *= arg_scale;
-			pt3 *= arg_scale;
-			pt4 *= arg_scale;
-			cv::line(frame, pt2, pt3, color, line_w);
-			cv::line(frame, pt3, pt4, color, line_w);
-			cv::line(frame, pt4, pt1, color, line_w);
-			cv::line(frame, pt1, pt2, color_top, line_w);
-			cv::circle(frame, pt1, line_w + 2, color_top, -1);
-			cv::circle(frame, pt2, line_w + 2, color, -1);
-			cv::circle(frame, pt3, line_w + 2, color, -1);
-			cv::circle(frame, pt4, line_w + 2, color, -1);
-			int fontface = cv::FONT_HERSHEY_SCRIPT_SIMPLEX;
-			double fontscale = 0.7;
-			int baseline;
-			std::string text = std::to_string(det->id);
-			cv::Point c = (pt1 + pt2 + pt3 + pt4) / 4;
-			cv::Size textsize = cv::getTextSize(text, fontface, fontscale, 2, &baseline);
-			cv::putText(frame, text, cv::Point(c.x - textsize.width / 2, c.y + textsize.height / 2), fontface, fontscale, cv::Scalar(0, 0, 255), 2);
+			auto end1 = std::chrono::steady_clock::now();
+			apriltag::zarray_t* detections = apriltag::apriltag_detector_detect(td, &im);
+			auto end2 = std::chrono::steady_clock::now();
+			double dt1 = std::chrono::duration_cast<std::chrono::nanoseconds>(end1 - beg).count() * 1e-9;
+			double dt2 = std::chrono::duration_cast<std::chrono::nanoseconds>(end2 - beg).count() * 1e-9;
+			std::cout << "Time: grub = " << dt1 << " s; detect = " << dt2 << " s." << std::endl;
+
+			// Draw.
+			cv::Mat gray(height, width, CV_8UC1, cam.getImageBufferData());
+			if (arg_scale == 1.0)
+				gray_sized = gray;
+			else
+				cv::resize(gray, gray_sized, cv::Size(), arg_scale, arg_scale);
+			cv::cvtColor(gray_sized, frame, cv::COLOR_GRAY2BGR);
+			const cv::Scalar color_top(0, 255, 0);
+			const cv::Scalar color(255, 0, 0);
+			const int line_w = 2;
+			const int text_w = 1;
+			for (int i = 0; i < zarray_size(detections); ++i)
+			{
+				apriltag::apriltag_detection_t* det;
+				apriltag::zarray_get(detections, i, &det);
+				if (det->hamming > 0)
+					continue;
+
+				cv::Point2d pt1(det->p[0][0], det->p[0][1]);
+				cv::Point2d pt2(det->p[1][0], det->p[1][1]);
+				cv::Point2d pt3(det->p[2][0], det->p[2][1]);
+				cv::Point2d pt4(det->p[3][0], det->p[3][1]);
+				pt1 *= arg_scale;
+				pt2 *= arg_scale;
+				pt3 *= arg_scale;
+				pt4 *= arg_scale;
+				cv::line(frame, pt2, pt3, color, line_w);
+				cv::line(frame, pt3, pt4, color, line_w);
+				cv::line(frame, pt4, pt1, color, line_w);
+				cv::line(frame, pt1, pt2, color_top, line_w);
+				cv::circle(frame, pt1, line_w + 2, color_top, -1);
+				cv::circle(frame, pt2, line_w + 2, color, -1);
+				cv::circle(frame, pt3, line_w + 2, color, -1);
+				cv::circle(frame, pt4, line_w + 2, color, -1);
+				int fontface = cv::FONT_HERSHEY_SCRIPT_SIMPLEX;
+				double fontscale = 0.7;
+				int baseline;
+				std::string text = std::to_string(det->id);
+				cv::Point c = (pt1 + pt2 + pt3 + pt4) / 4;
+				cv::Size textsize = cv::getTextSize(text, fontface, fontscale, 2, &baseline);
+				cv::putText(frame, text, cv::Point(c.x - textsize.width / 2, c.y + textsize.height / 2), fontface, fontscale, cv::Scalar(0, 0, 255), 2);
+			}
+			//
+			apriltag_detections_destroy(detections);
+
+			cv::imshow("frame", frame);
 		}
-		//
-		apriltag_detections_destroy(detections);
 
-		cv::imshow("frame", frame);
 		int key = cv::waitKey(1);
 		if (key == 27)
 			break;
-		if (key == 32)
+		if (key == 32 && !frame.empty())
 			cv::imwrite("frame.png", frame);
 	}
 
