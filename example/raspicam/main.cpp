@@ -77,7 +77,9 @@ int main(int argc, char* argv[])
 	const int arg_height = parser.get<int>("height");
 	const int arg_fps = parser.get<int>("fps");
 	const int arg_iso = parser.get<int>("iso");
-	const double arg_scale = parser.get<double>("scale");
+	double arg_scale = parser.get<double>("scale");
+	if (arg_scale < 0.1)
+		arg_scale = 0.1;
 
 	raspicam::RaspiCam cam;
 	cam.setFormat(raspicam::RASPICAM_FORMAT_GRAY);
@@ -133,6 +135,10 @@ int main(int argc, char* argv[])
 			cv::Point2d pt2(det->p[1][0], det->p[1][1]);
 			cv::Point2d pt3(det->p[2][0], det->p[2][1]);
 			cv::Point2d pt4(det->p[3][0], det->p[3][1]);
+			pt1 *= arg_scale;
+			pt2 *= arg_scale;
+			pt3 *= arg_scale;
+			pt4 *= arg_scale;
 			cv::line(frame, pt2, pt3, color, line_w);
 			cv::line(frame, pt3, pt4, color, line_w);
 			cv::line(frame, pt4, pt1, color, line_w);
