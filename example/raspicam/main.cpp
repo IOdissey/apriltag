@@ -1,7 +1,10 @@
 #include <chrono>
 #include <iostream>
 #include <string>
+#include <memory>
 
+// https://github.com/cedricve/raspicam
+#include <raspicam/raspicam.h>
 #include <opencv2/opencv.hpp>
 #include <apriltag/apriltag.h>
 #include <apriltag/tag36h11.h>
@@ -20,8 +23,10 @@ int main(int argc, char* argv[])
 	cv::String keys =
 		"{h help     |          | print this message}"
 		"{d device   | 0        | camera device number}"
-		"{iw width   | 0        | width}"
-		"{ih height  | 0        | height}"
+		"{iw width   | 1280     | width}"
+		"{ih height  | 1024     | height}"
+		"{fps        | 30       | fps}"
+		"{iso        | 800      | iso}"
 		"{f family   | tag36h11 | tag family to use}"
 		"{x decimate | 2.0      | decimate input image by this factor}"
 		"{b blur     | 0.0      | apply low-pass blur to input}"
@@ -76,30 +81,45 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 	const int arg_width = parser.get<int>("width");
-	if (arg_width > 0)
-		cap.set(cv::CAP_PROP_FRAME_WIDTH, arg_width);
 	const int arg_height = parser.get<int>("height");
-	if (arg_height > 0)
-		cap.set(cv::CAP_PROP_FRAME_HEIGHT, arg_height);
+	const int arg_fps = parser.get<int>("fps");
+	const int arg_iso = parser.get<int>("iso");
 
-	cv::Mat frame, gray;
+	raspicam::RaspiCam cam;
+	cam.setFormat(raspicam::RASPICAM_FORMAT_GRAY);
+	cam.setCaptureSize(arg_width, arg_height);
+	cam.setFrameRate(arg_fps);
+	cam.setISO(arg_iso);
+
+	int width = cam.getWidth();
+	int height = cam.getHeight();
+	if (!cam.open())
+	{
+		std::cout << "camera not opended." << std::endl;
+		return 0;
+	}
+	std::cout << "raspicam: " << width << "x" << height << "@" << cam.getFrameRate() << std::endl;
+
+	cv::Mat frame;
 	while (true)
 	{
-		cap >> frame;
-		cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
+		auto beg = std::chrono::steady_clock::now();
+		if (!cam.grab())
+			continue;
 
 		apriltag::image_u8_t im;
-		im.width = gray.cols;
-		im.height = gray.rows;
-		im.buf = gray.data;
+		im.width = width;
+		im.height = height;
+		im.buf = cam.getImageBufferData();
 
-		auto beg = std::chrono::steady_clock::now();
 		apriltag::zarray_t* detections = apriltag::apriltag_detector_detect(td, &im);
 		auto end = std::chrono::steady_clock::now();
 		double dt = std::chrono::duration_cast<std::chrono::nanoseconds>(end - beg).count() * 1e-9;
 		std::cout << "Time detect: " << dt << " s." << std::endl;
 
 		// Draw.
+		cv::Mat gray(height, width, CV_8UC1, cam.getImageBufferData());
+		cv::cvtColor(gray, frame, cv::COLOR_GRAY2BGR);
 		const cv::Scalar color_top(0, 255, 0);
 		const cv::Scalar color(255, 0, 0);
 		const int line_w = 2;
@@ -144,6 +164,8 @@ int main(int argc, char* argv[])
 
 	apriltag::apriltag_detector_destroy(td);
 	apriltag::tag_destroy(tf);
+
+	cam.release();
 
 	return 0;
 }

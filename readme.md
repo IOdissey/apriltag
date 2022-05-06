@@ -7,6 +7,7 @@ This is  header only version of the [AprilRobotics/apriltag](https://github.com/
 * no multithreading (consequence of the previous point)
 
 # Example
-All example is require opencv. Ros example is require roscpp.
+All example is require opencv. Ros example is require roscpp. Raspicam example is require [aspicam library](https://github.com/cedricve/raspicam).
 * example/camera
 * example/ros
+* example/raspicam
