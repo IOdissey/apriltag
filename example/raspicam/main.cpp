@@ -99,7 +99,7 @@ int main(int argc, char* argv[])
 	cv::Mat frame, gray_sized;;
 	while (true)
 	{
-		auto beg = std::chrono::steady_clock::now();
+		auto t0 = std::chrono::steady_clock::now();
 		if (cam.grab())
 		{
 			apriltag::image_u8_t im;
@@ -107,11 +107,11 @@ int main(int argc, char* argv[])
 			im.height = height;
 			im.buf = cam.getImageBufferData();
 
-			auto end1 = std::chrono::steady_clock::now();
+			auto t1 = std::chrono::steady_clock::now();
 			apriltag::zarray_t* detections = apriltag::apriltag_detector_detect(td, &im);
-			auto end2 = std::chrono::steady_clock::now();
-			double dt1 = std::chrono::duration_cast<std::chrono::nanoseconds>(end1 - beg).count() * 1e-9;
-			double dt2 = std::chrono::duration_cast<std::chrono::nanoseconds>(end2 - beg).count() * 1e-9;
+			auto t2 = std::chrono::steady_clock::now();
+			double dt1 = std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count() * 1e-9;
+			double dt2 = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count() * 1e-9;
 			std::cout << "Time: grub = " << dt1 << " s; detect = " << dt2 << " s." << std::endl;
 
 			// Draw.
