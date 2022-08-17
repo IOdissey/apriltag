@@ -26,6 +26,8 @@ of the authors and should not be interpreted as representing official policies,
 either expressed or implied, of the Regents of The University of Michigan.
 */
 
+#pragma once
+
 // limitation: image size must be <32768 in width and height. This is
 // because we use a fixed-point 16 bit integer representation with one
 // fractional bit.
@@ -38,15 +40,9 @@ either expressed or implied, of the Regents of The University of Michigan.
 #include "unionfind.h"
 #include "apriltag_types.h"
 
+
 namespace apriltag
 {
-	#ifdef _WIN32
-	inline long int random()
-	{
-		return rand();
-	}
-	#endif
-
 	inline uint32_t u64hash_2(uint64_t x) {
 		return (2654435761 * x) >> 32;
 	}
@@ -55,7 +51,6 @@ namespace apriltag
 	{
 		uint64_t id;
 		zarray_t* cluster;
-
 		uint64_zarray_entry_t* next;
 	};
 
@@ -64,7 +59,6 @@ namespace apriltag
 		// Note: these represent 2*actual value.
 		uint16_t x, y;
 		int16_t gx, gy;
-
 		float slope;
 	};
 

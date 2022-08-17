@@ -33,7 +33,8 @@ either expressed or implied, of the Regents of The University of Michigan.
 #include <cstdlib>
 #include <cstring>
 
-#include "math_util.h"
+#include "math.h"
+
 
 namespace apriltag
 {

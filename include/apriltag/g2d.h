@@ -29,6 +29,8 @@ either expressed or implied, of the Regents of The University of Michigan.
 #pragma once
 
 #include "zarray.h"
+#include "math.h"
+
 
 namespace apriltag
 {

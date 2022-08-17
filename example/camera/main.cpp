@@ -15,6 +15,47 @@
 // #include <apriltag/tagStandard52h13.h>
 
 
+class TagSolver
+{
+private:
+	cv::Mat _intrinsic;
+	cv::Mat _dist;
+	std::vector<cv::Point3d> _p3d;
+	std::vector<cv::Point2d> _p2d;
+
+public:
+	TagSolver(double len, double fx, double fy, double cx, double cy) :
+		_p3d(4), _p2d(4)
+	{
+		_intrinsic = cv::Mat(3, 3, CV_64FC1, cv::Scalar(0.0));
+		_intrinsic.ptr<double>(0)[0] = fx;
+		_intrinsic.ptr<double>(1)[1] = fy;
+		_intrinsic.ptr<double>(0)[2] = cx;
+		_intrinsic.ptr<double>(1)[2] = cy;
+		_intrinsic.ptr<double>(2)[2] = 1.0;
+
+		_dist = cv::Mat(1, 5, CV_64FC1, cv::Scalar(0.0));
+
+		len *= 0.5;
+		_p3d[0] = cv::Point3d(-len, len, 0);
+		_p3d[1] = cv::Point3d(len, len, 0);
+		_p3d[2] = cv::Point3d(len, -len, 0);
+		_p3d[3] = cv::Point3d(-len, -len, 0);
+	}
+
+	void solve(apriltag::apriltag_detection_t* det, cv::Vec3d& t, cv::Mat1d& rot)
+	{
+		_p2d[0] = cv::Point2d(det->p[0][0], det->p[0][1]);
+		_p2d[1] = cv::Point2d(det->p[1][0], det->p[1][1]);
+		_p2d[2] = cv::Point2d(det->p[2][0], det->p[2][1]);
+		_p2d[3] = cv::Point2d(det->p[3][0], det->p[3][1]);
+		cv::Vec3d r;
+		cv::solvePnP(_p3d, _p2d, _intrinsic, _dist, r, t, false, cv::SOLVEPNP_IPPE_SQUARE);
+		cv::Rodrigues(r, rot);
+	}
+};
+
+
 int main(int argc, char* argv[])
 {
 	cv::String keys =
@@ -32,6 +73,8 @@ int main(int argc, char* argv[])
 		parser.printMessage();
 		return 0;
 	}
+
+	std::cout << "OpenCV: " << CV_VERSION << std::endl;
 
 	apriltag::apriltag_family_t* tf = nullptr;
 	const std::string arg_family = parser.get<std::string>("family");
@@ -97,7 +140,7 @@ int main(int argc, char* argv[])
 		apriltag::zarray_t* detections = apriltag::apriltag_detector_detect(td, &im);
 		auto end = std::chrono::steady_clock::now();
 		double dt = std::chrono::duration_cast<std::chrono::nanoseconds>(end - beg).count() * 1e-9;
-		std::cout << "Time detect: " << dt << " s." << std::endl;
+		std::cout << std::endl << "Time detect: " << dt << " s." << std::endl;
 
 		// Draw.
 		const cv::Scalar color_top(0, 255, 0);
@@ -130,6 +173,18 @@ int main(int argc, char* argv[])
 			cv::Point c = (pt1 + pt2 + pt3 + pt4) / 4;
 			cv::Size textsize = cv::getTextSize(text, fontface, fontscale, 2, &baseline);
 			cv::putText(frame, text, cv::Point(c.x - textsize.width / 2, c.y + textsize.height / 2), fontface, fontscale, cv::Scalar(0, 0, 255), 2);
+
+			{
+				cv::Vec3d t;
+				cv::Mat1d rot(3, 3);
+				TagSolver tag_solver(1.0, im.height, im.height, im.width / 2, im.height / 2);
+				auto beg = std::chrono::steady_clock::now();
+				tag_solver.solve(det, t, rot);
+				auto end = std::chrono::steady_clock::now();
+				double dt = std::chrono::duration_cast<std::chrono::nanoseconds>(end - beg).count() * 1e-9;
+				std::cout << "pose dt = " << dt << std::endl;
+				std::cout << "pose = " << t[0] << " " << t[1] << " " << t[2] << std::endl;
+			}
 		}
 		//
 		apriltag_detections_destroy(detections);

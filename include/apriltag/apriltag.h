@@ -30,13 +30,12 @@ either expressed or implied, of the Regents of The University of Michigan.
 
 #include <cstdint>
 
-#include "matd.h"
 #include "zarray.h"
 #include "image_u8.h"
-#include "homography.h"
 #include "g2d.h"
 #include "apriltag_types.h"
 #include "apriltag_quad_thresh.h"
+#include "math.h"
 
 
 namespace apriltag
@@ -351,70 +350,6 @@ namespace apriltag
 		}
 	}
 
-	matd_t* homography_compute2(double c[4][4])
-	{
-		double A[] = {
-				c[0][0], c[0][1], 1,       0,       0, 0, -c[0][0] * c[0][2], -c[0][1] * c[0][2], c[0][2],
-				      0,       0, 0, c[0][0], c[0][1], 1, -c[0][0] * c[0][3], -c[0][1] * c[0][3], c[0][3],
-				c[1][0], c[1][1], 1,       0,       0, 0, -c[1][0] * c[1][2], -c[1][1] * c[1][2], c[1][2],
-				      0,       0, 0, c[1][0], c[1][1], 1, -c[1][0] * c[1][3], -c[1][1] * c[1][3], c[1][3],
-				c[2][0], c[2][1], 1,       0,       0, 0, -c[2][0] * c[2][2], -c[2][1] * c[2][2], c[2][2],
-				      0,       0, 0, c[2][0], c[2][1], 1, -c[2][0] * c[2][3], -c[2][1] * c[2][3], c[2][3],
-				c[3][0], c[3][1], 1,       0,       0, 0, -c[3][0] * c[3][2], -c[3][1] * c[3][2], c[3][2],
-				      0,       0, 0, c[3][0], c[3][1], 1, -c[3][0] * c[3][3], -c[3][1] * c[3][3], c[3][3],
-		};
-
-		double epsilon = 1e-10;
-
-		// Eliminate.
-		for (int col = 0; col < 8; col++) {
-			// Find best row to swap with.
-			double max_val = 0;
-			int max_val_idx = -1;
-			for (int row = col; row < 8; row++) {
-				double val = fabs(A[row * 9 + col]);
-				if (val > max_val) {
-					max_val = val;
-					max_val_idx = row;
-				}
-			}
-
-			if (max_val < epsilon) {
-				fprintf(stderr, "WRN: Matrix is singular.\n");
-				return NULL;
-			}
-
-			// Swap to get best row.
-			if (max_val_idx != col) {
-				for (int i = col; i < 9; i++) {
-					double tmp = A[col * 9 + i];
-					A[col * 9 + i] = A[max_val_idx * 9 + i];
-					A[max_val_idx * 9 + i] = tmp;
-				}
-			}
-
-			// Do eliminate.
-			for (int i = col + 1; i < 8; i++) {
-				double f = A[i * 9 + col] / A[col * 9 + col];
-				A[i * 9 + col] = 0;
-				for (int j = col + 1; j < 9; j++) {
-					A[i * 9 + j] -= f * A[col * 9 + j];
-				}
-			}
-		}
-
-		// Back solve.
-		for (int col = 7; col >= 0; col--) {
-			double sum = 0;
-			for (int i = col + 1; i < 8; i++) {
-				sum += A[col * 9 + i] * A[i * 9 + 8];
-			}
-			A[col * 9 + 8] = (A[col * 9 + 8] - sum) / A[col * 9 + col];
-		}
-		const double data[] = { A[8], A[17], A[26], A[35], A[44], A[53], A[62], A[71], 1 };
-		return matd_create_data(3, 3, data);
-	}
-
 	// returns non-zero if an error occurs (i.e., H has no inverse)
 	int quad_update_homographies(quad_t* quad)
 	{
@@ -427,22 +362,8 @@ namespace apriltag
 			corr_arr[i][3] = quad->p[i][1];
 		}
 
-		if (quad->H)
-			matd_destroy(quad->H);
-		if (quad->Hinv)
-			matd_destroy(quad->Hinv);
-
-		// XXX Tunable
-		quad->H = homography_compute2(corr_arr);
-		if (quad->H != NULL) {
-			quad->Hinv = matd_inverse(quad->H);
-			if (quad->Hinv != NULL) {
-			// Success!
-				return 0;
-			}
-			matd_destroy(quad->H);
-			quad->H = NULL;
-		}
+		if (homography_compute(corr_arr, quad->h))
+			return 0; // Success!
 
 		return -1;
 	}
@@ -461,72 +382,6 @@ namespace apriltag
 		gm->B[0] += x * gray;
 		gm->B[1] += y * gray;
 		gm->B[2] += gray;
-	}
-
-	// Computes the cholesky factorization of A, putting the lower
-	// triangular matrix into R.
-	inline void mat33_chol(const double* A, double* R)
-	{
-		// A[0] = R[0]*R[0]
-		R[0] = sqrt(A[0]);
-
-		// A[1] = R[0]*R[3];
-		R[3] = A[1] / R[0];
-
-		// A[2] = R[0]*R[6];
-		R[6] = A[2] / R[0];
-
-		// A[4] = R[3]*R[3] + R[4]*R[4]
-		R[4] = sqrt(A[4] - R[3] * R[3]);
-
-		// A[5] = R[3]*R[6] + R[4]*R[7]
-		R[7] = (A[5] - R[3] * R[6]) / R[4];
-
-		// A[8] = R[6]*R[6] + R[7]*R[7] + R[8]*R[8]
-		R[8] = sqrt(A[8] - R[6] * R[6] - R[7] * R[7]);
-
-		R[1] = 0;
-		R[2] = 0;
-		R[5] = 0;
-	}
-
-	inline void mat33_lower_tri_inv(const double* A, double* R)
-	{
-		// A[0]*R[0] = 1
-		R[0] = 1 / A[0];
-
-		// A[3]*R[0] + A[4]*R[3] = 0
-		R[3] = -A[3] * R[0] / A[4];
-
-		// A[4]*R[4] = 1
-		R[4] = 1 / A[4];
-
-		// A[6]*R[0] + A[7]*R[3] + A[8]*R[6] = 0
-		R[6] = (-A[6] * R[0] - A[7] * R[3]) / A[8];
-
-		// A[7]*R[4] + A[8]*R[7] = 0
-		R[7] = -A[7] * R[4] / A[8];
-
-		// A[8]*R[8] = 1
-		R[8] = 1 / A[8];
-	}
-
-	inline void mat33_sym_solve(const double* A, const double* B, double* R)
-	{
-		double L[9];
-		mat33_chol(A, L);
-
-		double M[9];
-		mat33_lower_tri_inv(L, M);
-
-		double tmp[3];
-		tmp[0] = M[0] * B[0];
-		tmp[1] = M[3] * B[0] + M[4] * B[1];
-		tmp[2] = M[6] * B[0] + M[7] * B[1] + M[8] * B[2];
-
-		R[0] = M[0] * tmp[0] + M[3] * tmp[1] + M[6] * tmp[2];
-		R[1] = M[4] * tmp[1] + M[7] * tmp[2];
-		R[2] = M[8] * tmp[2];
 	}
 
 	void graymodel_solve(graymodel_t* gm)
@@ -706,7 +561,7 @@ namespace apriltag
 				double tagy = 2 * (tagy01 - 0.5);
 
 				double px, py;
-				homography_project(quad->H, tagx, tagy, &px, &py);
+				homography_project(quad->h, tagx, tagy, &px, &py);
 
 				// don't round
 				int ix = px;
@@ -763,7 +618,7 @@ namespace apriltag
 			double tagy = 2 * (tagy01 - 0.5);
 
 			double px, py;
-			homography_project(quad->H, tagx, tagy, &px, &py);
+			homography_project(quad->h, tagx, tagy, &px, &py);
 
 			double v = value_for_pixel(im, px, py);
 
@@ -963,17 +818,14 @@ namespace apriltag
 					double c = cos(theta), s = sin(theta);
 
 					// Fix the rotation of our homography to properly orient the tag
-					matd_t* R = matd_create(3, 3);
-					MATD_EL(R, 0, 0) = c;
-					MATD_EL(R, 0, 1) = -s;
-					MATD_EL(R, 1, 0) = s;
-					MATD_EL(R, 1, 1) = c;
-					MATD_EL(R, 2, 2) = 1;
-					det->H = matd_op("M*M", quad->H, R);
+					double r[] = {
+						c, -s,  0,
+						s,  c,  0,
+						0,  0,  1
+					};
+					mat33_mull(quad->h, r, det->h);
 
-					matd_destroy(R);
-
-					homography_project(det->H, 0, 0, &det->c[0], &det->c[1]);
+					homography_project(det->h, 0, 0, &det->c[0], &det->c[1]);
 
 					// [-1, -1], [1, -1], [1, 1], [-1, 1], Desired points
 					// [-1, 1], [1, 1], [1, -1], [-1, -1], FLIP Y
@@ -986,7 +838,8 @@ namespace apriltag
 
 						double p[2];
 
-						homography_project(det->H, tcx, tcy, &p[0], &p[1]);
+						// homography_project(det->H, tcx, tcy, &p[0], &p[1]);
+						homography_project(det->h, tcx, tcy, &p[0], &p[1]);
 
 						det->p[i][0] = p[0];
 						det->p[i][1] = p[1];
@@ -1000,8 +853,6 @@ namespace apriltag
 		{
 			quad_t* quad;
 			zarray_get_volatile(quads, i, &quad);
-			matd_destroy(quad->H);
-			matd_destroy(quad->Hinv);
 		}
 		zarray_destroy(quads);
 

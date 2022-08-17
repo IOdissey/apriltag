@@ -30,8 +30,8 @@ either expressed or implied, of the Regents of The University of Michigan.
 
 #include <cstdint>
 
-#include "matd.h"
 #include "zarray.h"
+
 
 namespace apriltag
 {
@@ -43,17 +43,14 @@ namespace apriltag
 
 		// H: tag coordinates ([-1,1] at the black corners) to pixels
 		// Hinv: pixels to tag
-		matd_t *H, *Hinv;
+		// matd_t *H, *Hinv;
+		double h[9];
 	};
 
 	quad_t* quad_copy(const quad_t* quad)
 	{
 		quad_t* q = (quad_t*)calloc(1, sizeof(quad_t));
 		memcpy(q, quad, sizeof(quad_t));
-		if (quad->H)
-			q->H = matd_copy(quad->H);
-		if (quad->Hinv)
-			q->Hinv = matd_copy(quad->Hinv);
 		return q;
 	}
 
@@ -61,9 +58,6 @@ namespace apriltag
 	{
 		if (!quad)
 			return;
-
-		matd_destroy(quad->H);
-		matd_destroy(quad->Hinv);
 		free(quad);
 	}
 
@@ -231,7 +225,8 @@ namespace apriltag
 		// "ideal" tag (with corners at (-1,1), (1,1), (1,-1), and (-1,
 		// -1)) to pixels in the image. This matrix will be freed by
 		// apriltag_detection_destroy.
-		matd_t* H;
+		// matd_t* H;
+		double h[9];
 
 		// The center of the detection in image pixel coordinates.
 		double c[2];
@@ -246,8 +241,6 @@ namespace apriltag
 	{
 		if (det == NULL)
 			return;
-
-		matd_destroy(det->H);
 		free(det);
 	}
 
@@ -257,10 +250,8 @@ namespace apriltag
 		for (int i = 0; i < zarray_size(detections); i++) {
 			apriltag_detection_t* det;
 			zarray_get(detections, i, &det);
-
 			apriltag_detection_destroy(det);
 		}
-
 		zarray_destroy(detections);
 	}
 
