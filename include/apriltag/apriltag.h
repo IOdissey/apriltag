@@ -69,7 +69,8 @@ namespace apriltag
 
 	void quick_decode_add(struct quick_decode_t* qd, uint64_t code, int id, int hamming)
 	{
-		uint32_t bucket = code % qd->nentries;
+		// uint32_t bucket = code % qd->nentries;
+		uint32_t bucket = (code * 131) % qd->nentries;
 
 		while (qd->entries[bucket].rcode != UINT64_MAX) {
 			bucket = (bucket + 1) % qd->nentries;
@@ -94,10 +95,10 @@ namespace apriltag
 			capacity += family->ncodes * nbits;
 
 		if (maxhamming >= 2)
-			capacity += family->ncodes * nbits * (nbits - 1);
+			capacity += family->ncodes * nbits * (nbits - 1) / 2;
 
 		if (maxhamming >= 3)
-			capacity += family->ncodes * nbits * (nbits - 1) * (nbits - 2);
+			capacity += family->ncodes * nbits * (nbits - 1) * (nbits - 2) / 6;
 
 		qd->nentries = capacity * 3;
 
