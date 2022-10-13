@@ -57,7 +57,7 @@ namespace apriltag
 	image_u8_t* image_u8_copy(const image_u8_t* in)
 	{
 		image_u8_t* copy = image_u8_create(in->width, in->height);
-		memcpy(copy->buf, &in->buf, in->height * in->width * sizeof(uint8_t));
+		memcpy(copy->buf, in->buf, in->height * in->width * sizeof(uint8_t));
 		return copy;
 	}
 
